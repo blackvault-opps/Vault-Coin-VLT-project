@@ -1,0 +1,11 @@
+# Foundry
+cache/
+out/
+broadcast/
+lib/
+
+# Environment and editor files
+.env
+.DS_Store
+.idea/
+.vscode/
