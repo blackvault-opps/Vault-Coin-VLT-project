@@ -29,11 +29,14 @@ Required values:
 
 - `RPC_URL`: selected EVM testnet endpoint.
 - `PRIVATE_KEY`: funded testnet deployer private key.
-- `INITIAL_OWNER`: address authorized to pause, unpause, and transfer ownership.
-- `INITIAL_RECIPIENT`: address receiving all 100,000,000 VLT.
+- `EXPECTED_CHAIN_ID`: selected testnet chain ID; deployment reverts on a mismatch.
+- `INITIAL_OWNER`: deployed Safe contract authorized to pause, unpause, and begin
+  a two-step ownership transfer.
+- `INITIAL_TREASURY`: deployed treasury contract receiving all 100,000,000 VLT.
 - `ETHERSCAN_API_KEY`: optional explorer verification credential.
 
-The owner and recipient may be the same address.
+The constructor rejects externally owned accounts for both owner and treasury.
+The owner and treasury may be the same deployed contract.
 
 ## Simulate before broadcasting
 
@@ -44,7 +47,7 @@ forge script script/DeployVaultCoin.s.sol:DeployVaultCoin \
 ```
 
 Inspect the simulation carefully, including the network chain ID, constructor
-arguments, deployer balance, owner, recipient, and supply.
+arguments, deployer balance, owner, treasury, and supply.
 
 ## Broadcast to the selected testnet
 
@@ -60,7 +63,7 @@ testnet explorer supports Etherscan-compatible verification.
 ## Post-deployment verification
 
 Record the chain ID, network name, deployment transaction hash, contract address,
-compiler version, constructor arguments, owner, initial recipient, and runtime
+compiler version, constructor arguments, owner, initial treasury, and runtime
 bytecode hash. Then verify:
 
 ```bash
