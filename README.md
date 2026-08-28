@@ -9,8 +9,11 @@ review and testnet deployment. The project is **not deployed**.
 - Symbol: `VLT`
 - Decimals: `18`
 - Fixed supply: `100,000,000 VLT`
-- Initial distribution: the entire supply is minted once to the constructor's `initialRecipient`
-- Owner controls: pause transfers, unpause transfers, and transfer ownership
+- Initial distribution: the entire supply is minted once at deployment to the
+  constructor's contract-only `initialTreasury`
+- Owner: must be a deployed contract, intended to be a Safe multisig
+- Owner controls: pause transfers, unpause transfers, and two-step ownership transfer
+- Permit: EIP-2612 signed approvals
 - No post-deployment mint function
 - No burn function
 - Ownership renunciation is disabled

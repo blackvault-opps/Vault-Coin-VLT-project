@@ -4,10 +4,7 @@ pragma solidity 0.8.24;
 import {VaultCoin} from "../src/VaultCoin.sol";
 
 contract TokenActor {
-    function transfer(VaultCoin token, address to, uint256 amount)
-        external
-        returns (bool)
-    {
+    function transfer(VaultCoin token, address to, uint256 amount) external returns (bool) {
         return token.transfer(to, amount);
     }
 
@@ -17,6 +14,10 @@ contract TokenActor {
 
     function renounce(VaultCoin token) external {
         token.renounceOwnership();
+    }
+
+    function acceptOwnership(VaultCoin token) external {
+        token.acceptOwnership();
     }
 }
 
@@ -68,7 +69,20 @@ contract VaultCoinTest {
 
     function testOwnershipCanBeTransferred() public {
         token.transferOwnership(address(holder));
+        require(token.owner() == address(this), "owner changed before acceptance");
+        require(token.pendingOwner() == address(holder), "pending owner not set");
+        holder.acceptOwnership(token);
         require(token.owner() == address(holder), "owner not transferred");
+    }
+
+    function testOwnershipCannotBeTransferredToEOA() public {
+        bool reverted;
+        try token.transferOwnership(address(0xBEEF)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "EOA accepted as owner");
     }
 
     function testOwnershipCannotBeRenounced() public {
@@ -90,5 +104,25 @@ contract VaultCoinTest {
             reverted = true;
         }
         require(reverted, "zero recipient accepted");
+    }
+
+    function testEOAOwnerReverts() public {
+        bool reverted;
+        try new VaultCoin(address(0xBEEF), address(holder)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "EOA accepted as owner");
+    }
+
+    function testEOATreasuryReverts() public {
+        bool reverted;
+        try new VaultCoin(address(this), address(0xBEEF)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "EOA accepted as treasury");
     }
 }
