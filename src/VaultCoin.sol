@@ -10,27 +10,32 @@ import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 /// @title Vault Coin
 /// @notice Owner-controlled, pausable, non-burnable ERC-20 test token.
 /// @dev The full fixed supply is minted once during construction. No mint or burn
-///      function exists after deployment.
+///      function exists after deployment. Owner and treasury may be EOAs or contracts.
 contract VaultCoin is ERC20, ERC20Permit, ERC20Pausable, Ownable2Step {
     uint256 public constant INITIAL_SUPPLY = 100_000_000 ether;
+    address public immutable initialTreasury;
+
+    event VaultCoinInitialized(address indexed owner, address indexed treasury, uint256 supply);
 
     error RenouncingOwnershipDisabled();
-    error OwnerMustBeContract(address candidate);
-    error TreasuryMustBeContract(address candidate);
+    error ZeroAddressNotAllowed();
 
-    constructor(address initialOwner, address initialTreasury)
+    constructor(address initialOwner, address initialTreasuryAddress)
         ERC20("Vault Coin", "VLT")
         ERC20Permit("Vault Coin")
         Ownable(initialOwner)
     {
-        if (initialOwner.code.length == 0) {
-            revert OwnerMustBeContract(initialOwner);
+        if (initialOwner == address(0)) {
+            revert ZeroAddressNotAllowed();
         }
-        if (initialTreasury.code.length == 0) {
-            revert TreasuryMustBeContract(initialTreasury);
+        if (initialTreasuryAddress == address(0)) {
+            revert ZeroAddressNotAllowed();
         }
 
-        _mint(initialTreasury, INITIAL_SUPPLY);
+        initialTreasury = initialTreasuryAddress;
+        _mint(initialTreasuryAddress, INITIAL_SUPPLY);
+
+        emit VaultCoinInitialized(initialOwner, initialTreasuryAddress, INITIAL_SUPPLY);
     }
 
     /// @notice Stops token transfers until the owner unpauses the contract.
@@ -43,10 +48,10 @@ contract VaultCoin is ERC20, ERC20Permit, ERC20Pausable, Ownable2Step {
         _unpause();
     }
 
-    /// @notice Starts a two-step ownership transfer to another contract, such as a Safe.
+    /// @notice Starts a two-step ownership transfer. New owner may be EOA or contract.
     function transferOwnership(address newOwner) public override onlyOwner {
-        if (newOwner.code.length == 0) {
-            revert OwnerMustBeContract(newOwner);
+        if (newOwner == address(0)) {
+            revert ZeroAddressNotAllowed();
         }
         super.transferOwnership(newOwner);
     }
