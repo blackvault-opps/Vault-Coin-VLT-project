@@ -75,14 +75,20 @@ contract VaultCoinTest {
         require(token.owner() == address(holder), "owner not transferred");
     }
 
-    function testOwnershipCannotBeTransferredToEOA() public {
+    function testOwnershipCanBeTransferredToEOA() public {
+        address eoaOwner = 0xBEEF000000000000000000000000000000000000;
+        token.transferOwnership(eoaOwner);
+        require(token.pendingOwner() == eoaOwner, "EOA not accepted as pending owner");
+    }
+
+    function testOwnershipCannotBeTransferredToZeroAddress() public {
         bool reverted;
-        try token.transferOwnership(address(0xBEEF)) {
+        try token.transferOwnership(address(0)) {
             reverted = false;
         } catch {
             reverted = true;
         }
-        require(reverted, "EOA accepted as owner");
+        require(reverted, "zero address accepted as owner");
     }
 
     function testOwnershipCannotBeRenounced() public {
@@ -96,33 +102,49 @@ contract VaultCoinTest {
         require(token.owner() == address(this), "owner changed");
     }
 
-    function testZeroRecipientReverts() public {
+    function testZeroTreasuryReverts() public {
         bool reverted;
         try new VaultCoin(address(this), address(0)) {
             reverted = false;
         } catch {
             reverted = true;
         }
-        require(reverted, "zero recipient accepted");
+        require(reverted, "zero treasury accepted");
     }
 
-    function testEOAOwnerReverts() public {
+    function testZeroOwnerReverts() public {
         bool reverted;
-        try new VaultCoin(address(0xBEEF), address(holder)) {
+        try new VaultCoin(address(0), address(holder)) {
             reverted = false;
         } catch {
             reverted = true;
         }
-        require(reverted, "EOA accepted as owner");
+        require(reverted, "zero owner accepted");
     }
 
-    function testEOATreasuryReverts() public {
+    function testEOACanBeOwner() public {
+        address eoaOwner = 0xBEEF000000000000000000000000000000000000;
         bool reverted;
-        try new VaultCoin(address(this), address(0xBEEF)) {
+        try new VaultCoin(eoaOwner, address(holder)) {
             reverted = false;
         } catch {
             reverted = true;
         }
-        require(reverted, "EOA accepted as treasury");
+        require(!reverted, "EOA rejected as owner");
+    }
+
+    function testEOACanBeTreasury() public {
+        address eoaTreasury = 0xBEEF000000000000000000000000000000000000;
+        bool reverted;
+        try new VaultCoin(address(this), eoaTreasury) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(!reverted, "EOA rejected as treasury");
+    }
+
+    function testInitialTreasuryRecorded() public view {
+        require(token.initialTreasury() == address(holder), "initial treasury not recorded");
     }
 }
