@@ -19,7 +19,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: v1.8.1
 
       - name: Install dependencies
         run: |
@@ -28,6 +28,9 @@ jobs:
 
       - name: Check formatting
         run: forge fmt --check
+
+      - name: Lint
+        run: forge lint
 
       - name: Build
         run: forge build --sizes

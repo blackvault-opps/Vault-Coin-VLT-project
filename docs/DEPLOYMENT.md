@@ -1,77 +1,100 @@
-# Testnet deployment guide
+# Vault Coin deployment guide
 
-This repository prepares Vault Coin for review and testnet deployment. It does
-not deploy automatically and contains no private credentials.
+Vault Coin is not deployed by this repository. Merging code, compiling, testing,
+or simulating a script does not create an on-chain contract.
 
-## Prerequisites
+## Contract deployment behavior
 
-Install Foundry, then install the pinned dependencies:
+VaultCoin has a no-argument constructor:
 
-```bash
+- the transaction sender becomes the owner;
+- 100,000,000 VLT is minted to that same address; and
+- the owner may mint additional VLT after deployment.
+
+There is no maximum supply. The contract has no burn, pause, permit, proxy, or
+upgrade feature.
+
+## Pinned source dependencies
+
+~~~bash
 forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
 forge install foundry-rs/forge-std@v1.9.6 --no-commit
-```
+~~~
 
-## Review and test
+## Required local review
 
-```bash
+~~~bash
 forge fmt --check
 forge build --sizes
 forge test -vvv
-```
+forge inspect VaultCoin abi
+~~~
 
-## Configure locally
+All commands must pass on the exact proposed commit. Review the ABI to confirm
+that mint is present and burn, pause, permit, and upgrade functions are absent.
 
-Copy `.env.example` to `.env`. Use a dedicated testnet deployer key. Never
-commit `.env`.
+## Remix procedure
 
-Required values:
+1. Load src/VaultCoin.sol in Remix.
+2. Compile with Solidity 0.8.24 and optimization enabled with 200 runs.
+3. Inspect compiler warnings and the generated ABI.
+4. Select the intended wallet and network.
+5. Verify the wallet is intended to hold both ownership and the initial supply.
+6. Confirm the network chain ID in the wallet before submitting anything.
+7. Deploy with no constructor arguments only after a separate deployment approval.
 
-- `RPC_URL`: selected EVM testnet endpoint.
-- `PRIVATE_KEY`: funded testnet deployer private key.
-- `EXPECTED_CHAIN_ID`: selected testnet chain ID; deployment reverts on a mismatch.
-- `INITIAL_OWNER`: deployed Safe contract authorized to pause, unpause, and begin
-  a two-step ownership transfer.
-- `INITIAL_TREASURY`: deployed treasury contract receiving all 100,000,000 VLT.
-- `ETHERSCAN_API_KEY`: optional explorer verification credential.
+Remix uses the connected wallet as the transaction sender. An accidental
+deployment from the wrong account assigns both ownership and the initial supply
+to that wrong account.
 
-The constructor rejects externally owned accounts for both owner and treasury.
-The owner and treasury may be the same deployed contract.
+## Foundry simulation
 
-## Simulate before broadcasting
+Set only local, uncommitted environment values:
 
-```bash
-source .env
-forge script script/DeployVaultCoin.s.sol:DeployVaultCoin \
-  --rpc-url "$RPC_URL"
-```
+~~~bash
+export RPC_URL="https://your-rpc-endpoint.example"
+~~~
 
-Inspect the simulation carefully, including the network chain ID, constructor
-arguments, deployer balance, owner, treasury, and supply.
+Run a simulation without --broadcast:
 
-## Broadcast to the selected testnet
+~~~bash
+forge script script/DeployVaultCoin.s.sol:DeployVaultCoin --rpc-url "$RPC_URL"
+~~~
 
-```bash
-forge script script/DeployVaultCoin.s.sol:DeployVaultCoin \
-  --rpc-url "$RPC_URL" \
-  --broadcast
-```
+Inspect the chain ID, sender, created address, owner, initial owner balance, and
+total supply. A simulation is not evidence of deployment.
 
-Add `--verify --etherscan-api-key "$ETHERSCAN_API_KEY"` only when the selected
-testnet explorer supports Etherscan-compatible verification.
+## Broadcast gate
+
+Do not add --broadcast until all of the following are separately approved:
+
+- exact network and chain ID;
+- exact deploying/owner address;
+- deployment transaction fees;
+- final source commit;
+- independent review status; and
+- post-deployment verification plan.
+
+Use a hardware wallet or encrypted Foundry keystore where practical. Do not place
+a funded private key in this repository or its environment example.
 
 ## Post-deployment verification
 
-Record the chain ID, network name, deployment transaction hash, contract address,
-compiler version, constructor arguments, owner, initial treasury, and runtime
-bytecode hash. Then verify:
+Record the network, chain ID, transaction hash, contract address, deployer/owner,
+compiler version, optimizer settings, source commit, and explorer verification
+URL. Then verify:
 
-```bash
+~~~bash
 cast call CONTRACT_ADDRESS "name()(string)" --rpc-url "$RPC_URL"
 cast call CONTRACT_ADDRESS "symbol()(string)" --rpc-url "$RPC_URL"
+cast call CONTRACT_ADDRESS "decimals()(uint8)" --rpc-url "$RPC_URL"
 cast call CONTRACT_ADDRESS "totalSupply()(uint256)" --rpc-url "$RPC_URL"
 cast call CONTRACT_ADDRESS "owner()(address)" --rpc-url "$RPC_URL"
-cast call CONTRACT_ADDRESS "paused()(bool)" --rpc-url "$RPC_URL"
-```
+cast call CONTRACT_ADDRESS "balanceOf(address)(uint256)" OWNER_ADDRESS --rpc-url "$RPC_URL"
+~~~
 
-Expected total supply is `100000000000000000000000000` base units.
+Immediately after deployment, expected total supply and owner balance are both
+100000000000000000000000000 base units.
+
+Minting requires the current owner and amounts are supplied in base units. For
+example, one VLT is 1000000000000000000 base units.
