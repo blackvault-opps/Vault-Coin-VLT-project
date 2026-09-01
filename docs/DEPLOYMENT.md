@@ -1,100 +1,106 @@
 # Vault Coin deployment guide
 
-Vault Coin is not deployed by this repository. Merging code, compiling, testing,
-or simulating a script does not create an on-chain contract.
+Vault Coin is not deployed by this repository. The approved architecture deploys a
+`VaultCoin` implementation and an ERC-1967 proxy initialized atomically.
 
-## Contract deployment behavior
+Users and integrations must use the **proxy address**, not the implementation address.
+The implementation is locked against initialization in its constructor.
 
-VaultCoin has a no-argument constructor:
+## Fixed deployment configuration
 
-- the transaction sender becomes the owner;
-- 100,000,000 VLT is minted to that same address; and
-- the owner may mint additional VLT after deployment.
+| Parameter | Value |
+|---|---|
+| Owner | `0xc1cC3138699e07B6d7b990DBa8fAE30b332a1eA6` |
+| Initial recipient | Same owner Safe |
+| Fee recipient | Same owner Safe |
+| Initial supply | 100,000,000 VLT |
+| Lifetime ceiling | 420,000,000 VLT |
+| Initial admin-burn fee | 100 bps (1%) |
 
-There is no maximum supply. The contract has no burn, pause, permit, proxy, or
-upgrade feature.
+The deployment script hardcodes the confirmed Safe and verifies the initialized owner,
+balance, total supply and cumulative issuance before returning.
 
 ## Pinned source dependencies
 
 ~~~bash
 forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 --no-commit
 forge install foundry-rs/forge-std@v1.9.6 --no-commit
 ~~~
 
-## Required local review
+## Required local validation
 
 ~~~bash
 forge fmt --check
+forge lint --deny warnings
 forge build --sizes
 forge test -vvv
 forge inspect VaultCoin abi
 ~~~
 
-All commands must pass on the exact proposed commit. Review the ABI to confirm
-that mint is present and burn, pause, permit, and upgrade functions are absent.
+All commands must pass on the exact proposed commit. Review the ABI and confirm the
+presence and exact meaning of mint, pause, blacklist, burn, forced burn, seizure,
+recovery, ownership and upgrade functions.
 
-## Remix procedure
+## Non-broadcast simulation
 
-1. Load src/VaultCoin.sol in Remix.
-2. Compile with Solidity 0.8.24 and optimization enabled with 200 runs.
-3. Inspect compiler warnings and the generated ABI.
-4. Select the intended wallet and network.
-5. Verify the wallet is intended to hold both ownership and the initial supply.
-6. Confirm the network chain ID in the wallet before submitting anything.
-7. Deploy with no constructor arguments only after a separate deployment approval.
-
-Remix uses the connected wallet as the transaction sender. An accidental
-deployment from the wrong account assigns both ownership and the initial supply
-to that wrong account.
-
-## Foundry simulation
-
-Set only local, uncommitted environment values:
+A local script run without `--broadcast` creates no blockchain transaction:
 
 ~~~bash
-export RPC_URL="https://your-rpc-endpoint.example"
+forge script script/DeployVaultCoin.s.sol:DeployVaultCoin -vvv
 ~~~
 
-Run a simulation without --broadcast:
+A network simulation should use a separately selected public endpoint and still omit
+`--broadcast`:
 
 ~~~bash
-forge script script/DeployVaultCoin.s.sol:DeployVaultCoin --rpc-url "$RPC_URL"
+forge script script/DeployVaultCoin.s.sol:DeployVaultCoin --rpc-url "$RPC_URL" -vvv
 ~~~
 
-Inspect the chain ID, sender, created address, owner, initial owner balance, and
-total supply. A simulation is not evidence of deployment.
+Do not paste a private key, seed phrase, Safe signer secret or funded RPC credential into
+chat, source files, command history or `.env.example`. A Safe has no single private key.
+Use a supported hardware wallet, encrypted keystore or approved wallet flow for any
+separately authorized broadcast.
 
-## Broadcast gate
+## Pre-broadcast gate
 
-Do not add --broadcast until all of the following are separately approved:
+Before Sepolia or mainnet broadcast, independently confirm:
 
-- exact network and chain ID;
-- exact deploying/owner address;
-- deployment transaction fees;
-- final source commit;
-- independent review status; and
-- post-deployment verification plan.
+- the final commit and passing CI;
+- the full Safe address and deployed Safe bytecode on the target chain;
+- current Safe owners and threshold;
+- chain ID: Sepolia 11155111 or Ethereum mainnet 1;
+- deployer/proposer wallet and estimated fees;
+- the 1% initial administrative-burn fee;
+- implementation and proxy verification procedure;
+- independent security and legal review status; and
+- separate written deployment authorization for the exact network.
 
-Use a hardware wallet or encrypted Foundry keystore where practical. Do not place
-a funded private key in this repository or its environment example.
+No merge authorization is also implied by deployment authorization, or vice versa.
 
 ## Post-deployment verification
 
-Record the network, chain ID, transaction hash, contract address, deployer/owner,
-compiler version, optimizer settings, source commit, and explorer verification
-URL. Then verify:
+Record the network, chain ID, transaction hash, deployer, implementation address, proxy
+address, source commit, compiler settings and explorer links. Query the proxy:
 
 ~~~bash
-cast call CONTRACT_ADDRESS "name()(string)" --rpc-url "$RPC_URL"
-cast call CONTRACT_ADDRESS "symbol()(string)" --rpc-url "$RPC_URL"
-cast call CONTRACT_ADDRESS "decimals()(uint8)" --rpc-url "$RPC_URL"
-cast call CONTRACT_ADDRESS "totalSupply()(uint256)" --rpc-url "$RPC_URL"
-cast call CONTRACT_ADDRESS "owner()(address)" --rpc-url "$RPC_URL"
-cast call CONTRACT_ADDRESS "balanceOf(address)(uint256)" OWNER_ADDRESS --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "name()(string)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "symbol()(string)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "owner()(address)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "feeRecipient()(address)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "totalSupply()(uint256)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "cumulativeMinted()(uint256)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "MAX_SUPPLY()(uint256)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "adminBurnFeeBps()(uint16)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "paused()(bool)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "implementationVersion()(uint256)" --rpc-url "$RPC_URL"
+cast call PROXY_ADDRESS "balanceOf(address)(uint256)" \
+  0xc1cC3138699e07B6d7b990DBa8fAE30b332a1eA6 --rpc-url "$RPC_URL"
 ~~~
 
-Immediately after deployment, expected total supply and owner balance are both
-100000000000000000000000000 base units.
+Immediately after deployment, `totalSupply`, `cumulativeMinted` and the Safe balance
+must each be `100000000000000000000000000` base units. `owner` and `feeRecipient` must
+both equal the confirmed Safe, the fee must be 100 bps, and the proxy must be unpaused.
 
-Minting requires the current owner and amounts are supplied in base units. For
-example, one VLT is 1000000000000000000 base units.
+Do not exercise mint, pause, blacklist, forced burn, seizure or upgrade on mainnet as a
+verification shortcut. Rehearse those controls on Sepolia under separate authorization.

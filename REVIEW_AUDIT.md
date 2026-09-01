@@ -1,88 +1,91 @@
 # Vault Coin implementation review
 
-**Date:** August 31, 2026
+**Date:** September 1, 2026
 
-**Repository:** blackvault-opps/Vault-Coin-VLT-project
+**Repository:** `blackvault-opps/Vault-Coin-VLT-project`
 
-**Baseline commit:** b59d9dd261c9c3ee8c413ae2a5e21e67759031dd
+**Implementation branch:** `feature/vaultcoin-controls-uups`
 
-**Review scope:** Approved simplified ERC-20 replacement
+**Branch base:** `75afe8c2eb4448eb357fb457c425b6d2f0d4f437`
 
 **Deployment status:** Not deployed
 
-## Approved model
+## Authorized replacement model
 
 - Vault Coin / VLT / 18 decimals
-- 100,000,000 VLT initial supply
-- Deploying address is the initial owner and initial supply recipient
-- Owner-only additional minting with no supply cap
-- Standard ERC-20 transfers and approvals
-- No burn, pause, permit, proxy, upgrade, tax, blacklist, or seizure feature
+- 100,000,000 VLT initial supply to the confirmed owner Safe
+- 420,000,000 VLT lifetime issuance ceiling in V1
+- Owner mint, pause, blacklist, forced burn, seizure, recovery and upgrade controls
+- Holder `burn` and allowance-based `burnFrom`
+- ERC-1967 proxy with UUPS implementation upgrades
+- Two-step ownership replacement and no zero-owner state
+- No EIP-2612 permit, taxes or reflection behavior
 
-## Baseline evidence
-
-The untouched baseline was tested locally before implementation using Foundry
-v1.8.1 and Solidity 0.8.24.
-
-| Command | Baseline result |
-|---|---|
-| forge fmt --check | Failed: three invalid-checksum 0xBEEF address literals |
-| forge build --sizes | Failed to compile for the same three literals |
-| forge test -vvv | Failed before test execution for the same three literals |
-
-Zero baseline tests executed. The previous report's statement that 21 tests
-passed was not supported by the baseline source or current CI evidence and is
-superseded by this report.
-
-## Implementation review
+## Implementation mapping
 
 | Requirement | Implementation |
 |---|---|
-| Standard ERC-20 | OpenZeppelin ERC20 v5.0.2 |
-| Initial supply | INITIAL_SUPPLY = 100,000,000 ether |
-| Initial owner/recipient | msg.sender |
-| Additional minting | mint(to, amount), restricted by onlyOwner |
-| Zero-address mint rejection | OpenZeppelin ERC20InvalidReceiver |
-| Ownership | OpenZeppelin Ownable v5.0.2 |
-| Excluded extensions | No burn, pause, permit, proxy, or upgrade inheritance |
+| Initial owner/recipient | Confirmed Safe hardcoded by deployment script |
+| Lifetime issuance | `cumulativeMinted` plus 420M `MAX_SUPPLY` |
+| Holder burn | OpenZeppelin `ERC20BurnableUpgradeable` |
+| Pause | OpenZeppelin `PausableUpgradeable` applied to ordinary movement |
+| Blacklist | ERC-7201 namespaced mapping checked in transfer and approval hooks |
+| Forced burn | Owner-only, no allowance, added configurable fee, reason hash and event |
+| Confiscation | Owner-only transfer to any address, reason hash and event |
+| Recovery | Owner-only proxy-held ERC-20/ETH recovery |
+| Ownership | `Ownable2StepUpgradeable`; successor must be deployed contract |
+| Renunciation | Zero-owner call reverts; successor overload initiates two-step transfer |
+| Upgrade | `UUPSUpgradeable`; `_authorizeUpgrade` is owner-only |
+| Implementation lock | Constructor calls `_disableInitializers()` |
 
-## Modified-branch validation
+## Local validation evidence
 
-The proposed implementation was validated locally with Foundry v1.8.1
-(commit 982849d3140c01fd3b72905759581a132df7aa98) and Solidity 0.8.24.
-The GitHub Actions workflow is pinned to the same Foundry v1.8.1 release.
+Pinned local toolchain:
 
-| Command | Modified-branch result |
+- Foundry v1.8.1, commit `982849d3140c01fd3b72905759581a132df7aa98`
+- Solidity 0.8.24
+- OpenZeppelin Contracts v5.0.2
+- OpenZeppelin Contracts Upgradeable v5.0.2
+- forge-std v1.9.6
+
+Validation performed without an RPC endpoint, transaction signature or broadcast:
+
+| Command | Result |
 |---|---|
-| forge fmt --check | Passed |
-| forge lint | Passed with no findings |
-| forge build --sizes | Passed |
-| forge test -vvv | Passed: 12 passed, 0 failed, 0 skipped |
-| forge inspect VaultCoin abi | Passed; approved function surface confirmed |
-| forge script script/DeployVaultCoin.s.sol:DeployVaultCoin -vvv | Passed locally without RPC or broadcast |
+| `forge fmt` / `forge fmt --check` | Passed |
+| `forge lint --deny warnings` | Passed; no warnings |
+| `forge build --sizes` | Passed |
+| `forge test -vvv` | Passed: 41 tests, 0 failed, 0 skipped |
+| Fuzz test | Passed: 256 runs |
+| Stateful invariants | Passed: 256 runs, 128,000 calls, 0 reverts |
+| `forge coverage --report summary` | Passed; 41 tests re-executed |
+| Local deployment script test | Passed; implementation and initialized proxy verified |
 
-VaultCoin runtime bytecode is 2,243 bytes and initcode is 3,305 bytes.
+Production-contract coverage for `src/VaultCoin.sol`:
 
-The ABI contains standard ERC-20 and Ownable functions, INITIAL_SUPPLY, and
-mint(address,uint256). It contains no burn, pause, permit, proxy, or upgrade
-method.
+- Lines: 96.52% (111/115)
+- Statements: 97.62% (123/126)
+- Branches: 83.33% (15/18)
+- Functions: 96.30% (26/27)
 
-During test refinement, three negative-path tests temporarily failed because
-expected-revert calls were wrapped in assertTrue. Their traces showed the exact
-expected OpenZeppelin reverts. The harness was corrected to make those calls
-directly under expectRevert; the final suite passes in full.
+The suite covers initialization locking, owner authorization, lifetime cap, ordinary
+ERC-20 behavior, holder burns, pause, blacklist, forced burn fees, confiscation,
+recovery, two-step replacement, nonzero-owner invariant, invalid upgrades and storage
+preservation across a V1-to-V2 UUPS upgrade.
 
-## Material control risks
+## Known governance and operational risks
 
-- Supply is uncapped and the current owner can increase it at any time.
-- A compromised owner account can mint arbitrary quantities.
-- Standard Ownable permits irreversible ownership renunciation, after which no
-  further minting is possible.
-- There is no emergency pause or account-level restriction.
-- The contract is non-upgradeable; changing behavior requires a new deployment.
+- Owner powers are intentionally centralized and can directly alter holder balances.
+- Forced burns charge the target an additional fee.
+- Seizure can redirect VLT to any owner-selected address.
+- Administrative burn and seizure work while paused and against blacklisted accounts.
+- The owner can set the forced-burn fee as high as 10,000 bps.
+- A future UUPS upgrade can technically alter the cap or any other rule.
+- Safe signer and threshold controls exist outside VLT and must be independently checked.
 
 ## Review boundary
 
-This report documents implementation checks; it is not an independent security
-audit, legal opinion, token valuation, or authorization to deploy. Mainnet or
-testnet deployment requires a separate approval after pull-request review.
+This report records local implementation evidence. It is not an independent audit,
+legal opinion, merge authorization or authorization to deploy. Remote CI must pass on
+the pushed commit. Any merge, Sepolia transaction, mainnet transaction or future upgrade
+requires its own explicit authorization and verification record.
