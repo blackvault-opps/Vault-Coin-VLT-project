@@ -19,15 +19,19 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: v1.8.1
 
       - name: Install dependencies
         run: |
           forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 --no-commit
           forge install foundry-rs/forge-std@v1.9.6 --no-commit
 
       - name: Check formatting
         run: forge fmt --check
+
+      - name: Lint
+        run: forge lint --deny warnings
 
       - name: Build
         run: forge build --sizes

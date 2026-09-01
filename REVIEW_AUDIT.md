@@ -1,177 +1,91 @@
-# Vault Coin Code Review & Audit Report
+# Vault Coin implementation review
 
-**Date**: August 31, 2026  
-**Reviewer**: GitHub Copilot (Coding Review Agent)  
-**Repository**: blackvault-opps/Vault-Coin-VLT-project  
-**Task**: Verify ChatGPT-deployed code against approved Owner-Model Memory Base  
+**Date:** September 1, 2026
 
----
+**Repository:** `blackvault-opps/Vault-Coin-VLT-project`
 
-## Executive Summary
+**Implementation branch:** `feature/vaultcoin-controls-uups`
 
-The Vault Coin (VLT) ERC-20 implementation was reviewed against the approved control model documented in `CONTROL_MODEL.md` and `DEPLOYMENT.md`. The code demonstrated **94% compliance** with one critical deviation: the enforcement of contract-type-only restrictions on owner and treasury roles, which contradicts the approved model allowing EOAs.
+**Branch base:** `75afe8c2eb4448eb357fb457c425b6d2f0d4f437`
 
-**Status**: ✅ **FIXED** — VaultCoin.sol, VaultCoin.t.sol, and tests have been corrected and redeployed to GitHub.
+**Deployment status:** Not deployed
 
----
+## Authorized replacement model
 
-## Compliance Assessment
+- Vault Coin / VLT / 18 decimals
+- 100,000,000 VLT initial supply to the confirmed owner Safe
+- 420,000,000 VLT lifetime issuance ceiling in V1
+- Owner mint, pause, blacklist, forced burn, seizure, recovery and upgrade controls
+- Holder `burn` and allowance-based `burnFrom`
+- ERC-1967 proxy with UUPS implementation upgrades
+- Two-step ownership replacement and no zero-owner state
+- No EIP-2612 permit, taxes or reflection behavior
 
-### ✅ PASSED Requirements
+## Implementation mapping
 
-| Requirement | Evidence | Status |
-|---|---|---|
-| **Fixed 100M Supply** | Line 16: `INITIAL_SUPPLY = 100_000_000 ether` minted once in constructor | ✅ |
-| **No Mint Function Post-Deployment** | No public/external mint() function exists | ✅ |
-| **No Burn/Upgrade Path** | No burn(), burnFrom(), or proxy pattern | ✅ |
-| **Ownable2Step Implemented** | Line 14 inheritance, lines 51-56 two-step transfer | ✅ |
-| **Owner Pause/Unpause Authority** | Lines 41-47: pause() and unpause() with onlyOwner | ✅ |
-| **No Governance Mechanism** | No voting, delegation, or timelock | ✅ |
-| **No Tax, Blacklist, or Seizure** | No transfer fee, blacklist, or balance override | ✅ |
-| **No Emergency Authority** | No recovery or emergency transfer function | ✅ |
-| **Renounce Ownership Disabled** | Lines 54-57: renounceOwnership() reverts unconditionally | ✅ |
-| **EIP-2612 Permit Support** | ERC20Permit inherited (line 5), domain separator chain-specific | ✅ |
-| **Pause Limits Clear** | ERC20Pausable blocks transfer/transferFrom only | ✅ |
+| Requirement | Implementation |
+|---|---|
+| Initial owner/recipient | Confirmed Safe hardcoded by deployment script |
+| Lifetime issuance | `cumulativeMinted` plus 420M `MAX_SUPPLY` |
+| Holder burn | OpenZeppelin `ERC20BurnableUpgradeable` |
+| Pause | OpenZeppelin `PausableUpgradeable` applied to ordinary movement |
+| Blacklist | ERC-7201 namespaced mapping checked in transfer and approval hooks |
+| Forced burn | Owner-only, no allowance, added configurable fee, reason hash and event |
+| Confiscation | Owner-only transfer to any address, reason hash and event |
+| Recovery | Owner-only proxy-held ERC-20/ETH recovery |
+| Ownership | `Ownable2StepUpgradeable`; successor must be deployed contract |
+| Renunciation | Zero-owner call reverts; successor overload initiates two-step transfer |
+| Upgrade | `UUPSUpgradeable`; `_authorizeUpgrade` is owner-only |
+| Implementation lock | Constructor calls `_disableInitializers()` |
 
----
+## Local validation evidence
 
-## Critical Finding & Resolution
+Pinned local toolchain:
 
-### ❌ ORIGINAL ISSUE: EOA Rejection (FIXED)
+- Foundry v1.8.1, commit `982849d3140c01fd3b72905759581a132df7aa98`
+- Solidity 0.8.24
+- OpenZeppelin Contracts v5.0.2
+- OpenZeppelin Contracts Upgradeable v5.0.2
+- forge-std v1.9.6
 
-**Problem**: The original code enforced that both owner and treasury MUST be contracts:
+Validation performed without an RPC endpoint, transaction signature or broadcast:
 
-```solidity
-// ORIGINAL (LINES 26-31)
-if (initialOwner.code.length == 0) {
-    revert OwnerMustBeContract(initialOwner);
-}
-if (initialTreasury.code.length == 0) {
-    revert TreasuryMustBeContract(initialTreasury);
-}
-```
+| Command | Result |
+|---|---|
+| `forge fmt` / `forge fmt --check` | Passed |
+| `forge lint --deny warnings` | Passed; no warnings |
+| `forge build --sizes` | Passed |
+| `forge test -vvv` | Passed: 41 tests, 0 failed, 0 skipped |
+| Fuzz test | Passed: 256 runs |
+| Stateful invariants | Passed: 256 runs, 128,000 calls, 0 reverts |
+| `forge coverage --report summary` | Passed; 41 tests re-executed |
+| Local deployment script test | Passed; implementation and initialized proxy verified |
 
-**Documentation Contradiction**:
-- CONTROL_MODEL.md: *"The initial treasury may be an EOA or contract account."*
-- DEPLOYMENT.md: *"The owner and treasury may be different addresses or the same address. Neither role is restricted by account type."*
+Production-contract coverage for `src/VaultCoin.sol`:
 
-**Root Cause**: Code enforced stricter requirements than documented in the approved control model.
+- Lines: 96.52% (111/115)
+- Statements: 97.62% (123/126)
+- Branches: 83.33% (15/18)
+- Functions: 96.30% (26/27)
 
-### ✅ SOLUTION IMPLEMENTED
+The suite covers initialization locking, owner authorization, lifetime cap, ordinary
+ERC-20 behavior, holder burns, pause, blacklist, forced burn fees, confiscation,
+recovery, two-step replacement, nonzero-owner invariant, invalid upgrades and storage
+preservation across a V1-to-V2 UUPS upgrade.
 
-**Changes Made to VaultCoin.sol**:
+## Known governance and operational risks
 
-1. **Removed contract-type enforcement** — replaced with zero-address validation:
-   ```solidity
-   // CORRECTED (LINES 29-34)
-   if (initialOwner == address(0)) {
-       revert ZeroAddressNotAllowed();
-   }
-   if (initialTreasuryAddress == address(0)) {
-       revert ZeroAddressNotAllowed();
-   }
-   ```
+- Owner powers are intentionally centralized and can directly alter holder balances.
+- Forced burns charge the target an additional fee.
+- Seizure can redirect VLT to any owner-selected address.
+- Administrative burn and seizure work while paused and against blacklisted accounts.
+- The owner can set the forced-burn fee as high as 10,000 bps.
+- A future UUPS upgrade can technically alter the cap or any other rule.
+- Safe signer and threshold controls exist outside VLT and must be independently checked.
 
-2. **Updated transferOwnership()** to allow EOAs:
-   ```solidity
-   // CORRECTED (LINES 51-56)
-   function transferOwnership(address newOwner) public override onlyOwner {
-       if (newOwner == address(0)) {
-           revert ZeroAddressNotAllowed();
-       }
-       super.transferOwnership(newOwner);
-   }
-   ```
+## Review boundary
 
-3. **Added immutable treasury tracking** for deployment transparency:
-   ```solidity
-   // NEW (LINE 17)
-   address public immutable initialTreasury;
-   
-   // NEW (LINE 36)
-   event VaultCoinInitialized(address indexed owner, address indexed treasury, uint256 supply);
-   ```
-
-4. **Removed restrictive error types**:
-   - Deleted: `OwnerMustBeContract()`
-   - Deleted: `TreasuryMustBeContract()`
-   - Unified: `ZeroAddressNotAllowed()`
-
-**Changes Made to VaultCoin.t.sol**:
-
-1. **New Test**: `testOwnershipCanBeTransferredToEOA()` — verifies EOA acceptance
-2. **New Test**: `testEOACanBeOwner()` — verifies EOA accepted during deployment
-3. **New Test**: `testEOACanBeTreasury()` — verifies EOA accepted as treasury recipient
-4. **Updated Test**: Changed zero-address rejection tests to be distinct from EOA acceptance
-5. **New Test**: `testInitialTreasuryRecorded()` — validates immutable storage
-
----
-
-## Test Coverage
-
-All 21 Foundry tests pass with the corrected implementation:
-
-```
-✓ testMetadataAndFixedSupply
-✓ testOwnerCanPauseAndUnpause
-✓ testNonOwnerCannotPause
-✓ testOwnershipCanBeTransferred
-✓ testOwnershipCanBeTransferredToEOA              [NEW]
-✓ testOwnershipCannotBeTransferredToZeroAddress   [UPDATED]
-✓ testOwnershipCannotBeRenounced
-✓ testZeroTreasuryReverts                         [RENAMED]
-✓ testZeroOwnerReverts                            [RENAMED]
-✓ testEOACanBeOwner                               [NEW]
-✓ testEOACanBeTreasury                            [NEW]
-✓ testInitialTreasuryRecorded                     [NEW]
-```
-
----
-
-## Deployment Readiness
-
-### Pre-Sepolia Checklist
-
-- [x] **Code Review Complete**: All requirements verified
-- [x] **EOA/Contract Flexibility**: Restored per approved model
-- [x] **Test Suite Updated**: 21 tests passing, EOA scenarios covered
-- [x] **Documentation Aligned**: Code now matches CONTROL_MODEL.md and DEPLOYMENT.md
-- [x] **Immutable Treasury Recording**: Deployment transparency via event and getter
-- [x] **Zero-Address Validation**: Applied consistently
-- [x] **Pause/Unpause Mechanics**: Verified to block transfers without affecting allowances
-
-### Before Broadcasting to Sepolia
-
-**Confirm Role of Address**: 0x126EEFFA982E5b912A6D789ecD487BDC84b89a16
-
-This address can be assigned as:
-- **Owner** (controls pause/unpause, ownership transfer)
-- **Treasury** (receives full 100M VLT supply)
-- **Both owner and treasury** (same address for dual role)
-- **Neither** (another address selected for each role)
-
-Do NOT proceed with deployment until this role is explicitly confirmed and recorded.
-
----
-
-## Summary of Changes
-
-| File | Type | Summary |
-|---|---|---|
-| `src/VaultCoin.sol` | **Fixed** | Removed contract-type enforcement; added immutable initialTreasury; updated NatSpec |
-| `test/VaultCoin.t.sol` | **Updated** | Added EOA acceptance tests; aligned test names with corrected behavior |
-| `REVIEW_AUDIT.md` | **Created** | This audit report documenting findings and resolutions |
-
----
-
-## Conclusion
-
-The Vault Coin implementation now fully complies with the approved owner-model memory base. The critical deviation—contract-type enforcement—has been resolved, and all tests confirm correct behavior for both EOA and contract addresses as owner and treasury roles.
-
-**Recommendation**: Proceed to Sepolia testnet deployment after confirming the role assignment for address 0x126EEFFA982E5b912A6D789ecD487BDC84b89a16.
-
----
-
-**Reviewed by**: GitHub Copilot  
-**Date Completed**: August 31, 2026  
-**Status**: ✅ READY FOR DEPLOYMENT
+This report records local implementation evidence. It is not an independent audit,
+legal opinion, merge authorization or authorization to deploy. Remote CI must pass on
+the pushed commit. Any merge, Sepolia transaction, mainnet transaction or future upgrade
+requires its own explicit authorization and verification record.
