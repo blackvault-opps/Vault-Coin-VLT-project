@@ -49,3 +49,10 @@ jobs:
 
       - name: Simulate deployment locally
         run: forge script script/DeployVaultCoin.s.sol:DeployVaultCoin -vvvv
+
+      - name: Verify confirmed Safe on Sepolia (read-only)
+        env:
+          SEPOLIA_RPC_URL: https://eth-sepolia.api.onfinality.io/public
+        run: |
+          forge script script/SepoliaPreflight.s.sol:SepoliaPreflight \
+            --rpc-url "$SEPOLIA_RPC_URL" -vvvv
