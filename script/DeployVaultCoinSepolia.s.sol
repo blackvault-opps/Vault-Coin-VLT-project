@@ -8,11 +8,7 @@ import {SepoliaChecks} from "./SepoliaPreflight.s.sol";
 
 /// @notice Sepolia-only deployment entry point. Omit --broadcast for simulation.
 contract DeployVaultCoinSepolia is DeployVaultCoin {
-    function run()
-        external
-        override
-        returns (VaultCoin token, VaultCoin implementation, ERC1967Proxy proxy)
-    {
+    function run() external override returns (VaultCoin token, VaultCoin implementation, ERC1967Proxy proxy) {
         SepoliaChecks.verify(OWNER_AND_TREASURY);
         return _deploy();
     }
