@@ -6,10 +6,16 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {VaultCoin} from "../src/VaultCoin.sol";
 
 contract DeployVaultCoin is Script {
+    uint256 public constant LOCAL_CHAIN_ID = 31337;
     address public constant OWNER_AND_TREASURY = 0xc1cC3138699e07B6d7b990DBa8fAE30b332a1eA6;
     uint16 public constant INITIAL_ADMIN_BURN_FEE_BPS = 100;
 
-    function run() external returns (VaultCoin token, VaultCoin implementation, ERC1967Proxy proxy) {
+    function run() external virtual returns (VaultCoin token, VaultCoin implementation, ERC1967Proxy proxy) {
+        require(block.chainid == LOCAL_CHAIN_ID, "use a network-specific deployment script");
+        return _deploy();
+    }
+
+    function _deploy() internal returns (VaultCoin token, VaultCoin implementation, ERC1967Proxy proxy) {
         vm.startBroadcast();
         implementation = new VaultCoin();
         bytes memory initializer =
@@ -19,6 +25,9 @@ contract DeployVaultCoin is Script {
 
         token = VaultCoin(payable(address(proxy)));
         require(token.owner() == OWNER_AND_TREASURY, "unexpected owner");
+        require(token.feeRecipient() == OWNER_AND_TREASURY, "unexpected fee recipient");
+        require(token.adminBurnFeeBps() == INITIAL_ADMIN_BURN_FEE_BPS, "unexpected admin-burn fee");
+        require(!token.paused(), "token unexpectedly paused");
         // forge-lint: disable-next-line(incorrect-strict-equality)
         require(token.balanceOf(OWNER_AND_TREASURY) == token.INITIAL_SUPPLY(), "unexpected initial balance");
         require(token.totalSupply() == token.INITIAL_SUPPLY(), "unexpected total supply");

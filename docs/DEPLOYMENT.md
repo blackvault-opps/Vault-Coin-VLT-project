@@ -104,3 +104,47 @@ both equal the confirmed Safe, the fee must be 100 bps, and the proxy must be un
 
 Do not exercise mint, pause, blacklist, forced burn, seizure or upgrade on mainnet as a
 verification shortcut. Rehearse those controls on Sepolia under separate authorization.
+
+## Phase 2 — Sepolia preflight and deployment rehearsal
+
+Phase 2 introduces separate local and Sepolia entry points. The generic
+`DeployVaultCoin` entry point now accepts only Foundry's local chain ID (`31337`). This
+prevents it from being used accidentally for a live network. Sepolia deployment must
+use the Sepolia-gated script.
+
+### Read-only Safe preflight
+
+~~~bash
+DEPLOYER_ADDRESS=0xPUBLIC_DEPLOYER_ADDRESS \
+forge script script/SepoliaPreflight.s.sol:SepoliaPreflight \
+  --rpc-url "$SEPOLIA_RPC" -vvvv
+~~~
+
+The deployer address is optional and public. The script requires chain ID `11155111`,
+deployed bytecode at the confirmed Safe, four unique nonzero Safe owners and threshold
+three. It does not create a contract, sign a transaction or broadcast state changes.
+
+### Local deployment simulation
+
+~~~bash
+forge script script/DeployVaultCoin.s.sol:DeployVaultCoin -vvvv
+~~~
+
+### Sepolia fork simulation and gas estimate
+
+~~~bash
+forge script script/DeployVaultCoinSepolia.s.sol:DeployVaultCoinSepolia \
+  --rpc-url "$SEPOLIA_RPC" --sender 0xPUBLIC_DEPLOYER_ADDRESS -vvvv
+~~~
+
+Omit `--broadcast` throughout preflight. Record the implementation deployment gas, proxy
+deployment and initialization gas, current fee inputs, and estimated maximum cost in
+`docs/SEPOLIA_PREFLIGHT_REPORT.md`.
+
+The 50% funding buffer is advisory. A balance below the simulated maximum transaction
+requirement at the selected fee settings is a hard stop. A smaller positive margin may
+proceed only under the later, separate authorization for the exact broadcast.
+
+Before any Sepolia broadcast, record a passing CI run for the exact commit and rerun the
+read-only Safe preflight and Sepolia simulation against the same RPC. The eventual live
+command must be reviewed separately; Phase 2 authorization does not authorize it.

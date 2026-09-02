@@ -2,8 +2,9 @@ name: Foundry CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/phase-2-sepolia-preflight"]
   pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -12,6 +13,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -38,3 +40,12 @@ jobs:
 
       - name: Test
         run: forge test -vvv
+
+      - name: Coverage summary
+        run: forge coverage --report summary
+
+      - name: Inspect VaultCoin ABI
+        run: forge inspect VaultCoin abi
+
+      - name: Simulate deployment locally
+        run: forge script script/DeployVaultCoin.s.sol:DeployVaultCoin -vvvv
