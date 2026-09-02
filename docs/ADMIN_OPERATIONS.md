@@ -14,9 +14,11 @@ Required checks:
 2. Confirm the full target address and target balance.
 3. Confirm the burn amount in 18-decimal base units.
 4. Calculate and disclose the additional fee with `adminBurnFee(amount)`.
-5. Store the supporting decision/evidence outside the chain.
-6. Hash that record and use the nonzero hash as `reasonHash`.
-7. Obtain the Safe threshold and inspect the resulting event.
+5. Confirm the target is not the configured fee recipient. If it is, select and
+   disclose a different fee recipient before continuing.
+6. Store the supporting decision/evidence outside the chain.
+7. Hash that record and use the nonzero hash as `reasonHash`.
+8. Obtain the Safe threshold and inspect the resulting event.
 
 The reason hash proves only that a value was recorded. It does not prove that the
 underlying reason was truthful, lawful or warranted.
@@ -24,8 +26,8 @@ underlying reason was truthful, lawful or warranted.
 ## Seizure
 
 `seize(from, amount, to, reasonHash)` transfers VLT without allowance and may send it to
-any nonzero address. Verify both complete addresses. This action bypasses pause and
-blacklist restrictions and does not reduce total supply.
+any different, nonzero address. Verify both complete addresses. This action bypasses
+pause and blacklist restrictions and does not reduce total supply.
 
 ## Pause
 

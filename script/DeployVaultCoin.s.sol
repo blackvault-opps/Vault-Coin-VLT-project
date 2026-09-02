@@ -10,8 +10,10 @@ contract DeployVaultCoin is Script {
     address public constant OWNER_AND_TREASURY = 0xc1cC3138699e07B6d7b990DBa8fAE30b332a1eA6;
     uint16 public constant INITIAL_ADMIN_BURN_FEE_BPS = 100;
 
+    error InvalidDeploymentChain(uint256 actualChainId);
+
     function run() external virtual returns (VaultCoin token, VaultCoin implementation, ERC1967Proxy proxy) {
-        require(block.chainid == LOCAL_CHAIN_ID, "use a network-specific deployment script");
+        if (block.chainid != LOCAL_CHAIN_ID) revert InvalidDeploymentChain(block.chainid);
         return _deploy();
     }
 

@@ -22,10 +22,10 @@ balance, total supply and cumulative issuance before returning.
 
 ## Pinned source dependencies
 
+The dependency commits are recorded as Git submodules and in `foundry.lock`.
+
 ~~~bash
-forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
-forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 --no-commit
-forge install foundry-rs/forge-std@v1.9.6 --no-commit
+git submodule update --init
 ~~~
 
 ## Required local validation
@@ -121,7 +121,12 @@ forge script script/SepoliaPreflight.s.sol:SepoliaPreflight \
 ~~~
 
 The deployer address is optional and public. The script requires chain ID `11155111`,
-deployed bytecode at the confirmed Safe, four Safe owners and threshold three. It does not create a contract, sign a transaction or broadcast state changes.
+deployed bytecode at the confirmed Safe, four distinct nonzero Safe owners and threshold
+three. It does not create a contract, sign a transaction or broadcast state changes.
+
+The repository's `Sepolia Read-Only Preflight` GitHub Actions workflow runs this check
+only when manually triggered. Normal pull-request and push CI remains deterministic and
+does not contact an RPC endpoint.
 
 ### Local deployment simulation
 

@@ -5,9 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {VaultCoin} from "../src/VaultCoin.sol";
 import {DeployVaultCoinSepolia} from "../script/DeployVaultCoinSepolia.s.sol";
-import {SepoliaPreflight} from "../script/SepoliaPreflight.s.sol";
+import {ISafe, SepoliaChecks, SepoliaPreflight} from "../script/SepoliaPreflight.s.sol";
 
-contract MockSepoliaSafe {
+contract MockSepoliaSafe is ISafe {
     function getOwners() external pure returns (address[] memory owners) {
         owners = new address[](4);
         owners[0] = address(0x1001);
@@ -39,14 +39,70 @@ contract SepoliaPreflightTest is Test {
     function testReadOnlyPreflightRejectsWrongChain() public {
         vm.chainId(1);
         SepoliaPreflight preflight = new SepoliaPreflight();
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SepoliaChecks.InvalidChain.selector, 1));
         preflight.run();
     }
 
     function testReadOnlyPreflightRejectsMissingSafeCode() public {
         vm.etch(CONFIRMED_SAFE, hex"");
         SepoliaPreflight preflight = new SepoliaPreflight();
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SepoliaChecks.SafeCodeMissing.selector, CONFIRMED_SAFE));
+        preflight.run();
+    }
+
+    function testReadOnlyPreflightRejectsFailedOwnerQuery() public {
+        vm.mockCallRevert(CONFIRMED_SAFE, ISafe.getOwners.selector, hex"01");
+        SepoliaPreflight preflight = new SepoliaPreflight();
+
+        vm.expectRevert(abi.encodeWithSelector(SepoliaChecks.SafeOwnersCallFailed.selector, CONFIRMED_SAFE));
+        preflight.run();
+    }
+
+    function testReadOnlyPreflightRejectsFailedThresholdQuery() public {
+        vm.mockCallRevert(CONFIRMED_SAFE, ISafe.getThreshold.selector, hex"01");
+        SepoliaPreflight preflight = new SepoliaPreflight();
+
+        vm.expectRevert(abi.encodeWithSelector(SepoliaChecks.SafeThresholdCallFailed.selector, CONFIRMED_SAFE));
+        preflight.run();
+    }
+
+    function testReadOnlyPreflightRejectsUnexpectedOwnerCount() public {
+        address[] memory owners = new address[](3);
+        owners[0] = address(0x1001);
+        owners[1] = address(0x1002);
+        owners[2] = address(0x1003);
+        vm.mockCall(CONFIRMED_SAFE, abi.encodeCall(ISafe.getOwners, ()), abi.encode(owners));
+        SepoliaPreflight preflight = new SepoliaPreflight();
+
+        vm.expectRevert(abi.encodeWithSelector(SepoliaChecks.UnexpectedOwnerCount.selector, 3));
+        preflight.run();
+    }
+
+    function testReadOnlyPreflightRejectsUnexpectedThreshold() public {
+        vm.mockCall(CONFIRMED_SAFE, abi.encodeCall(ISafe.getThreshold, ()), abi.encode(uint256(2)));
+        SepoliaPreflight preflight = new SepoliaPreflight();
+
+        vm.expectRevert(abi.encodeWithSelector(SepoliaChecks.UnexpectedThreshold.selector, 2));
+        preflight.run();
+    }
+
+    function testReadOnlyPreflightRejectsZeroOwner() public {
+        address[] memory owners = _owners();
+        owners[2] = address(0);
+        vm.mockCall(CONFIRMED_SAFE, abi.encodeCall(ISafe.getOwners, ()), abi.encode(owners));
+        SepoliaPreflight preflight = new SepoliaPreflight();
+
+        vm.expectRevert(abi.encodeWithSelector(SepoliaChecks.InvalidSafeOwner.selector, address(0)));
+        preflight.run();
+    }
+
+    function testReadOnlyPreflightRejectsDuplicateOwner() public {
+        address[] memory owners = _owners();
+        owners[3] = owners[1];
+        vm.mockCall(CONFIRMED_SAFE, abi.encodeCall(ISafe.getOwners, ()), abi.encode(owners));
+        SepoliaPreflight preflight = new SepoliaPreflight();
+
+        vm.expectRevert(abi.encodeWithSelector(SepoliaChecks.DuplicateSafeOwner.selector, owners[1]));
         preflight.run();
     }
 
@@ -61,5 +117,13 @@ contract SepoliaPreflightTest is Test {
         assertEq(token.balanceOf(CONFIRMED_SAFE), token.INITIAL_SUPPLY());
         assertEq(token.adminBurnFeeBps(), 100);
         assertFalse(token.paused());
+    }
+
+    function _owners() private pure returns (address[] memory owners) {
+        owners = new address[](4);
+        owners[0] = address(0x1001);
+        owners[1] = address(0x1002);
+        owners[2] = address(0x1003);
+        owners[3] = address(0x1004);
     }
 }

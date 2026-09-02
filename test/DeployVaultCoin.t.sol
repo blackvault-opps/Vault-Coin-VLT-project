@@ -21,4 +21,13 @@ contract DeployVaultCoinTest is Test {
         assertEq(token.cumulativeMinted(), 100_000_000 ether);
         assertEq(token.adminBurnFeeBps(), 100);
     }
+
+    function testGenericDeploymentScriptRejectsNonLocalChain() public {
+        vm.chainId(1);
+        DeployVaultCoin deployment = new DeployVaultCoin();
+
+        vm.expectRevert(abi.encodeWithSelector(DeployVaultCoin.InvalidDeploymentChain.selector, 1));
+        // forge-lint: disable-next-line(unused-return)
+        deployment.run();
+    }
 }

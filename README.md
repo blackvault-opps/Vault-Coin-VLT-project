@@ -4,6 +4,11 @@ Vault Coin is an owner-managed ERC-20 using an ERC-1967 proxy and the OpenZeppel
 UUPS upgrade pattern. The project is under pre-deployment review and is **not
 deployed**.
 
+This is the canonical technical repository. Public journey pages for Vault Coin,
+BlackVault Public Network and SafeVault are maintained separately. References between
+those projects do not establish a shared deployment, contract, treasury, owner or
+authorization relationship.
+
 ## Approved design
 
 | Property | Value |
@@ -43,7 +48,9 @@ an action is legally or factually justified.
 
 At the initial 1% fee, `adminBurn(account, 100 ether, reasonHash)` requires the account
 to hold at least 101 VLT. It transfers 1 VLT to the fee recipient and destroys 100 VLT.
-It cannot burn a nonexistent or negative balance.
+It cannot burn a nonexistent or negative balance. The target cannot also be the current
+fee recipient; the owner must select a different fee recipient before administratively
+burning from that account.
 
 ## Holder controls
 
@@ -71,12 +78,16 @@ outside this token's authorization model.
 
 - `src/VaultCoin.sol` — upgradeable token implementation
 - `script/DeployVaultCoin.s.sol` — implementation and proxy deployment script
+- `script/DeployVaultCoinSepolia.s.sol` — Sepolia-gated deployment rehearsal entry point
+- `script/SepoliaPreflight.s.sol` — read-only Sepolia Safe checks
 - `test/VaultCoin.t.sol` — unit, fuzz, authorization and upgrade tests
 - `test/VaultCoin.invariant.t.sol` — stateful supply and ownership invariants
 - `test/DeployVaultCoin.t.sol` — local deployment-script verification
+- `test/SepoliaPreflight.t.sol` — Sepolia gate and Safe-validation tests
 - `CONTROL_MODEL.md` — exact authority and trust boundaries
 - `docs/ADMIN_OPERATIONS.md` — warning labels and administrative procedures
 - `docs/DEPLOYMENT.md` — simulation and separately authorized deployment procedure
+- `docs/SEPOLIA_PREFLIGHT_REPORT.md` — blank evidence record for Phase 2
 - `docs/UPGRADES.md` — upgrade review and execution controls
 - `REVIEW_AUDIT.md` — implementation and validation evidence
 - `SECURITY.md` — security assumptions and reporting policy
@@ -90,14 +101,19 @@ outside this token's authorization model.
 - Foundry v1.8.1
 
 ~~~bash
-forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
-forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 --no-commit
-forge install foundry-rs/forge-std@v1.9.6 --no-commit
+git submodule update --init
 forge fmt --check
 forge lint --deny warnings
 forge build --sizes
 forge test -vvv
+forge coverage --report summary
+forge inspect VaultCoin abi
+forge script script/DeployVaultCoin.s.sol:DeployVaultCoin -vvvv
 ~~~
+
+The Sepolia read-only check is intentionally isolated in the manually triggered
+`Sepolia Read-Only Preflight` workflow. Normal CI never depends on a public RPC and
+cannot broadcast a network transaction.
 
 ## Deployment status
 

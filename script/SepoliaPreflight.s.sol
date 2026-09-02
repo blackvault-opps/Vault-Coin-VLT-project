@@ -18,6 +18,8 @@ library SepoliaChecks {
     error SafeCodeMissing(address safe);
     error SafeOwnersCallFailed(address safe);
     error SafeThresholdCallFailed(address safe);
+    error InvalidSafeOwner(address owner);
+    error DuplicateSafeOwner(address owner);
     error UnexpectedOwnerCount(uint256 actualOwnerCount);
     error UnexpectedThreshold(uint256 actualThreshold);
 
@@ -40,6 +42,25 @@ library SepoliaChecks {
 
         if (owners.length != 4) revert UnexpectedOwnerCount(owners.length);
         if (threshold != 3) revert UnexpectedThreshold(threshold);
+
+        _requireValidOwner(owners[0]);
+        _requireValidOwner(owners[1]);
+        _requireValidOwner(owners[2]);
+        _requireValidOwner(owners[3]);
+        _requireDistinctOwners(owners[0], owners[1]);
+        _requireDistinctOwners(owners[0], owners[2]);
+        _requireDistinctOwners(owners[0], owners[3]);
+        _requireDistinctOwners(owners[1], owners[2]);
+        _requireDistinctOwners(owners[1], owners[3]);
+        _requireDistinctOwners(owners[2], owners[3]);
+    }
+
+    function _requireValidOwner(address owner) private pure {
+        if (owner == address(0)) revert InvalidSafeOwner(owner);
+    }
+
+    function _requireDistinctOwners(address firstOwner, address secondOwner) private pure {
+        if (firstOwner == secondOwner) revert DuplicateSafeOwner(secondOwner);
     }
 }
 
@@ -47,7 +68,7 @@ contract SepoliaPreflight is Script {
     address public constant CONFIRMED_SAFE = 0xc1cC3138699e07B6d7b990DBa8fAE30b332a1eA6;
 
     /// @notice Performs read-only Sepolia and Safe checks. Never use --broadcast.
-    function run() external {
+    function run() external view {
         (address[] memory owners, uint256 threshold) = SepoliaChecks.verify(CONFIRMED_SAFE);
 
         console2.log("Sepolia preflight: OK");

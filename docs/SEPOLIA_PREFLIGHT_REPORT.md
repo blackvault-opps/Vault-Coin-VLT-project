@@ -20,6 +20,7 @@ private key, seed phrase, keystore password or hardware-wallet recovery material
 - Confirmed Safe: `0xc1cC3138699e07B6d7b990DBa8fAE30b332a1eA6`
 - Safe bytecode present:
 - Safe owners (public addresses):
+- Safe owners are nonzero and unique:
 - Safe threshold: `3-of-4`
 - Deployer public address:
 - Deployer Sepolia ETH balance:

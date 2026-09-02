@@ -68,14 +68,16 @@ confiscation powers.
 4. destroys the requested amount from the target.
 
 The target must hold `amount + fee`. No allowance is requested, but no nonexistent
-balance can be burned. The initial fee is 100 bps (1%). Holder `burn` and `burnFrom`
-remain fee-free.
+balance can be burned. The target and configured fee recipient must be different so a
+self-transfer cannot bypass the fee; the owner must first select a different fee
+recipient when necessary. The initial fee is 100 bps (1%). Holder `burn` and
+`burnFrom` remain fee-free.
 
 ## Confiscation
 
-`seize(from, amount, to, reasonHash)` transfers VLT from any funded address to any
-nonzero owner-selected address without allowance. It requires a nonzero reason hash
-and works while paused and against blacklisted accounts.
+`seize(from, amount, to, reasonHash)` transfers VLT from any funded address to a
+different, nonzero owner-selected address without allowance. It requires a nonzero
+reason hash and works while paused and against blacklisted accounts.
 
 ## Asset recovery
 
