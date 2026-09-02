@@ -52,7 +52,7 @@ jobs:
 
       - name: Verify confirmed Safe on Sepolia (read-only)
         env:
-          SEPOLIA_RPC_URL: https://eth-sepolia.api.onfinality.io/public
+          SEPOLIA_RPC_URL: https://ethereum-sepolia-rpc.publicnode.com
         run: |
           forge script script/SepoliaPreflight.s.sol:SepoliaPreflight \
             --rpc-url "$SEPOLIA_RPC_URL" -vvvv
