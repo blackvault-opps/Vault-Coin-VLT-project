@@ -121,8 +121,7 @@ forge script script/SepoliaPreflight.s.sol:SepoliaPreflight \
 ~~~
 
 The deployer address is optional and public. The script requires chain ID `11155111`,
-deployed bytecode at the confirmed Safe, four unique nonzero Safe owners and threshold
-three. It does not create a contract, sign a transaction or broadcast state changes.
+deployed bytecode at the confirmed Safe, four Safe owners and threshold three. It does not create a contract, sign a transaction or broadcast state changes.
 
 ### Local deployment simulation
 

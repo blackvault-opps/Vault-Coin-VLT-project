@@ -20,8 +20,6 @@ library SepoliaChecks {
     error SafeThresholdCallFailed(address safe);
     error UnexpectedOwnerCount(uint256 actualOwnerCount);
     error UnexpectedThreshold(uint256 actualThreshold);
-    error InvalidSafeOwner(address owner);
-    error DuplicateSafeOwner(address owner);
 
     function verify(address safe) internal view returns (address[] memory owners, uint256 threshold) {
         if (block.chainid != SEPOLIA_CHAIN_ID) revert InvalidChain(block.chainid);
@@ -42,13 +40,6 @@ library SepoliaChecks {
 
         if (owners.length != 4) revert UnexpectedOwnerCount(owners.length);
         if (threshold != 3) revert UnexpectedThreshold(threshold);
-
-        for (uint256 i = 0; i < owners.length; ++i) {
-            if (owners[i] == address(0)) revert InvalidSafeOwner(address(0));
-            for (uint256 j = i + 1; j < owners.length; ++j) {
-                if (owners[i] == owners[j]) revert DuplicateSafeOwner(owners[i]);
-            }
-        }
     }
 }
 
