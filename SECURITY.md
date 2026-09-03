@@ -39,8 +39,10 @@ an implementation replacement.
 - Zero-owner renunciation prohibited
 - Lifetime cumulative-mint accounting
 - Mandatory reason hashes for forced burn and seizure
+- Fee-recipient separation for administrative burns
+- Nonzero, unique Safe-owner checks during Sepolia preflight
 - Reentrancy protection on external asset recovery
-- Pinned compiler, dependency and Foundry versions
+- Pinned compiler, dependency, Foundry and CI-action versions
 - Unit, fuzz, invariant, deployment and upgrade-state tests
 
 ## Operational safeguards

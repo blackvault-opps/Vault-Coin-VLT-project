@@ -263,6 +263,18 @@ contract VaultCoinTest is Test {
         assertEq(token.totalSupply(), INITIAL_SUPPLY);
     }
 
+    function testAdministrativeBurnRejectsTargetAsFeeRecipient() public {
+        _sendFromOwner(alice, 100 ether);
+        vm.startPrank(owner);
+        token.setFeeRecipient(alice);
+        vm.expectRevert(abi.encodeWithSelector(VaultCoin.AdministrativeFeeRecipientIsBurnAccount.selector, alice));
+        token.adminBurn(alice, 100 ether, REASON_HASH);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(alice), 100 ether);
+        assertEq(token.totalSupply(), INITIAL_SUPPLY);
+    }
+
     function testAdministrativeBurnRequiresReasonAndPositiveAmount() public {
         vm.startPrank(owner);
         vm.expectRevert(VaultCoin.ReasonHashRequired.selector);
@@ -378,6 +390,8 @@ contract VaultCoinTest is Test {
         token.seize(owner, 1 ether, bob, bytes32(0));
         vm.expectRevert(VaultCoin.AdministrativeAmountIsZero.selector);
         token.seize(owner, 0, bob, REASON_HASH);
+        vm.expectRevert(abi.encodeWithSelector(IERC20Errors.ERC20InvalidReceiver.selector, owner));
+        token.seize(owner, 1 ether, owner, REASON_HASH);
         vm.stopPrank();
     }
 

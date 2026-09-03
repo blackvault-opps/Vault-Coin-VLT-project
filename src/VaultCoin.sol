@@ -49,6 +49,7 @@ contract VaultCoin is
         0xac2698fa95a160b02b4094c7bd78ca8eb07c425877174f90e4df40b910d38600;
 
     error AccountBlacklisted(address account);
+    error AdministrativeFeeRecipientIsBurnAccount(address account);
     error AdministrativeAmountIsZero();
     error FeeBpsOutOfRange(uint256 feeBps);
     error InvalidFeeRecipient(address recipient);
@@ -190,14 +191,16 @@ contract VaultCoin is
         if (reasonHash == bytes32(0)) revert ReasonHashRequired();
 
         VaultCoinStorage storage $ = _getVaultCoinStorage();
+        address recipient = $.feeRecipient;
+        if (account == recipient) revert AdministrativeFeeRecipientIsBurnAccount(account);
         uint256 fee = adminBurnFee(amount);
         $.administrativeOperation = true;
-        _transfer(account, $.feeRecipient, fee);
+        _transfer(account, recipient, fee);
         _burn(account, amount);
         $.administrativeOperation = false;
 
         // forge-lint: disable-next-line(reentrancy-events)
-        emit AdminBurn(msg.sender, account, amount, fee, $.feeRecipient, reasonHash);
+        emit AdminBurn(msg.sender, account, amount, fee, recipient, reasonHash);
     }
 
     /// @notice WARNING: Forcibly transfers VLT without holder approval.
@@ -205,6 +208,7 @@ contract VaultCoin is
     function seize(address from, uint256 amount, address to, bytes32 reasonHash) external onlyOwner {
         if (amount == 0) revert AdministrativeAmountIsZero();
         if (reasonHash == bytes32(0)) revert ReasonHashRequired();
+        if (from == to) revert ERC20InvalidReceiver(to);
 
         VaultCoinStorage storage $ = _getVaultCoinStorage();
         $.administrativeOperation = true;

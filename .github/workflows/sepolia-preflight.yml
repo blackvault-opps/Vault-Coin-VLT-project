@@ -1,0 +1,33 @@
+name: Sepolia Read-Only Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-safe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.8.1
+
+      - name: Build preflight scripts
+        run: forge build
+
+      - name: Verify confirmed Safe on Sepolia
+        env:
+          SEPOLIA_RPC_URL: https://ethereum-sepolia-rpc.publicnode.com
+        run: |
+          forge script script/SepoliaPreflight.s.sol:SepoliaPreflight \
+            --rpc-url "$SEPOLIA_RPC_URL" -vvvv

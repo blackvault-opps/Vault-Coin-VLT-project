@@ -4,28 +4,31 @@ on:
   push:
     branches: ["main"]
   pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          submodules: true
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
         with:
           version: v1.8.1
-
-      - name: Install dependencies
-        run: |
-          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
-          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 --no-commit
-          forge install foundry-rs/forge-std@v1.9.6 --no-commit
 
       - name: Check formatting
         run: forge fmt --check
@@ -38,3 +41,12 @@ jobs:
 
       - name: Test
         run: forge test -vvv
+
+      - name: Coverage summary
+        run: forge coverage --report summary
+
+      - name: Inspect VaultCoin ABI
+        run: forge inspect VaultCoin abi
+
+      - name: Simulate deployment locally
+        run: forge script script/DeployVaultCoin.s.sol:DeployVaultCoin -vvvv
